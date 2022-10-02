@@ -28,5 +28,6 @@ jobs:
       - name: Run pytest
         run: |
           pytest
-      - uses: codespell-project/actions-codespell@master
-        ignore_words_list: hass
+      - uses: codespell-project/actions-codespell@v1.0
+        with:
+          ignore_words_list: hass
