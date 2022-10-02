@@ -1,25 +1,25 @@
 """Tests for calendar platform of local calendar."""
 
-from collections.abc import Awaitable, Callable
 import datetime
+import urllib
+import zoneinfo
+from collections.abc import Awaitable, Callable
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
-import urllib
 
-from aiohttp import ClientSession, ClientWebSocketResponse
+import homeassistant.util.dt as dt_util
 import pytest
-
-from custom_components.local_calendar import LocalCalendarStore
-from custom_components.local_calendar.const import CONF_CALENDAR_NAME, DOMAIN
+from aiohttp import ClientSession, ClientWebSocketResponse
 from homeassistant.const import STATE_OFF, STATE_ON
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.template import DATE_STR_FORMAT
 from homeassistant.setup import async_setup_component
-import homeassistant.util.dt as dt_util
-
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+from custom_components.local_calendar import LocalCalendarStore
+from custom_components.local_calendar.const import CONF_CALENDAR_NAME, DOMAIN
 
 CALENDAR_NAME = "Light Schedule"
 FRIENDLY_NAME = "Light schedule"
@@ -50,9 +50,7 @@ def mock_store() -> None:
     def new_store(hass: HomeAssistant, path: Path) -> FakeStore:
         return FakeStore(hass, path)
 
-    with patch(
-        "custom_components.local_calendar.LocalCalendarStore", new=new_store
-    ):
+    with patch("custom_components.local_calendar.LocalCalendarStore", new=new_store):
         yield
 
 
@@ -62,6 +60,10 @@ def set_time_zone(hass: HomeAssistant):
     # Set our timezone to CST/Regina so we can check calculations
     # This keeps UTC-6 all year round
     hass.config.set_time_zone("America/Regina")
+    with patch(
+        "ical.util.local_timezone", return_value=zoneinfo.ZoneInfo("America/Regina")
+    ):
+        yield
 
 
 @pytest.fixture(name="config_entry")
@@ -70,9 +72,12 @@ def mock_config_entry() -> MockConfigEntry:
     return MockConfigEntry(domain=DOMAIN, data={CONF_CALENDAR_NAME: CALENDAR_NAME})
 
 
-@pytest.fixture(name="setup_integration")
-async def setup_integration(hass: HomeAssistant, config_entry: MockConfigEntry, enable_custom_integrations) -> None:
+@pytest.fixture(name="_setup_integration")
+async def setup_integration(
+    hass: HomeAssistant, config_entry: MockConfigEntry, enable_custom_integrations
+) -> None:
     """Set up the integration."""
+    _ = enable_custom_integrations
     config_entry.add_to_hass(hass)
     assert await async_setup_component(hass, DOMAIN, {})
     await hass.async_block_till_done()
@@ -108,7 +113,8 @@ def get_events_fixture(
     async def _fetch(start: str, end: str) -> None:
         client = await hass_client()
         response = await client.get(
-            f"/api/calendars/{TEST_ENTITY}?start={urllib.parse.quote(start)}&end={urllib.parse.quote(end)}"
+            f"/api/calendars/{TEST_ENTITY}?start={urllib.parse.quote(start)}"
+            f"&end={urllib.parse.quote(end)}"
         )
         assert response.status == HTTPStatus.OK
         return await response.json()
@@ -118,14 +124,10 @@ def get_events_fixture(
 
 def event_fields(data: dict[str, str]) -> dict[str, str]:
     """Filter event API response to minimum fields."""
-    return {
-        k: data.get(k)
-        for k in ["summary", "start", "end"]
-        if data.get(k)
-    }
+    return {k: data.get(k) for k in ["summary", "start", "end"] if data.get(k)}
 
 
-async def test_empty_calendar(hass, setup_integration, get_events):
+async def test_empty_calendar(hass, _setup_integration, get_events):
     """Test querying the API and fetching events."""
     events = await get_events("1997-07-14T00:00:00", "1997-07-16T00:00:00")
     assert len(events) == 0
@@ -138,7 +140,7 @@ async def test_empty_calendar(hass, setup_integration, get_events):
     }
 
 
-async def test_api_date_time_event(setup_integration, create_event, get_events):
+async def test_api_date_time_event(_setup_integration, create_event, get_events):
     """Test an event with a start/end date time."""
     await create_event(
         {
@@ -172,7 +174,7 @@ async def test_api_date_time_event(setup_integration, create_event, get_events):
     assert len(events) == 1
 
 
-async def test_api_date_event(setup_integration, create_event, get_events):
+async def test_api_date_event(_setup_integration, create_event, get_events):
     """Test an event with a start/end date all day event."""
     await create_event(
         {
@@ -206,7 +208,7 @@ async def test_api_date_event(setup_integration, create_event, get_events):
     assert len(events) == 1
 
 
-async def test_active_event(hass, setup_integration, create_event):
+async def test_active_event(hass, _setup_integration, create_event):
     """Test an event with a start/end date time."""
     start = dt_util.now() - datetime.timedelta(minutes=30)
     end = dt_util.now() + datetime.timedelta(minutes=30)
@@ -227,13 +229,12 @@ async def test_active_event(hass, setup_integration, create_event):
         "all_day": False,
         "description": "",
         "location": "",
-        "message": "Evening lights",
         "start_time": start.strftime(DATE_STR_FORMAT),
         "end_time": end.strftime(DATE_STR_FORMAT),
     }
 
 
-async def test_upcoming_event(hass, setup_integration, create_event):
+async def test_upcoming_event(hass, _setup_integration, create_event):
     """Test an event with a start/end date time."""
     start = dt_util.now() + datetime.timedelta(days=1)
     end = dt_util.now() + datetime.timedelta(days=1, hours=1)
@@ -254,13 +255,12 @@ async def test_upcoming_event(hass, setup_integration, create_event):
         "all_day": False,
         "description": "",
         "location": "",
-        "message": "Evening lights",
         "start_time": start.strftime(DATE_STR_FORMAT),
         "end_time": end.strftime(DATE_STR_FORMAT),
     }
 
 
-async def test_recurring_event(setup_integration, create_event, get_events):
+async def test_recurring_event(_setup_integration, create_event, get_events):
     """Test an event with a recurrence rule."""
     await create_event(
         {
@@ -302,20 +302,20 @@ class Client:
     def __init__(self, client):
         """Initialize Client."""
         self.client = client
-        self.id = 0
+        self._id = 0
 
     async def cmd(self, cmd: str, payload: dict[str, Any] = None) -> dict[str, Any]:
         """Send a command and receive the json result."""
-        self.id += 1
+        self._id += 1
         await self.client.send_json(
             {
-                "id": self.id,
+                "id": self._id,
                 "type": f"calendar/event/{cmd}",
                 **(payload if payload is not None else {}),
             }
         )
         resp = await self.client.receive_json()
-        assert resp.get("id") == self.id
+        assert resp.get("id") == self._id
         return resp
 
     async def cmd_result(self, cmd: str, payload: dict[str, Any] = None) -> Any:
@@ -329,8 +329,8 @@ class Client:
 ClientFixture = Callable[[], Client]
 
 
-@pytest.fixture
-async def ws_client(
+@pytest.fixture(name="ws_client")
+async def mock_ws_client(
     hass_ws_client: Callable[[...], ClientWebSocketResponse]
 ) -> ClientFixture:
     """Fixture for creating the test websocket client."""
@@ -343,7 +343,7 @@ async def ws_client(
 
 
 async def test_websocket_create(
-    ws_client: ClientFixture, setup_integration: None, get_events: GetEventsFn
+    ws_client: ClientFixture, _setup_integration: None, get_events: GetEventsFn
 ):
     """Test websocket create command."""
     client = await ws_client()
@@ -369,7 +369,7 @@ async def test_websocket_create(
 
 
 async def test_websocket_delete(
-    ws_client: ClientFixture, setup_integration: None, get_events: GetEventsFn
+    ws_client: ClientFixture, _setup_integration: None, get_events: GetEventsFn
 ):
     """Test websocket delete command."""
     client = await ws_client()
@@ -404,11 +404,11 @@ async def test_websocket_delete(
         },
     )
     events = await get_events("1997-07-14T00:00:00", "1997-07-16T00:00:00")
-    assert list(map(event_fields, events)) == []
+    assert not list(map(event_fields, events))
 
 
 async def test_websocket_delete_recurring(
-    ws_client: ClientFixture, setup_integration: None, get_events: GetEventsFn
+    ws_client: ClientFixture, _setup_integration: None, get_events: GetEventsFn
 ):
     """Test deleting a recurring event."""
     client = await ws_client()
@@ -500,7 +500,7 @@ async def test_websocket_delete_recurring(
 
 
 async def test_websocket_update(
-    ws_client: ClientFixture, setup_integration: None, get_events: GetEventsFn
+    ws_client: ClientFixture, _setup_integration: None, get_events: GetEventsFn
 ):
     """Test websocket update command."""
     client = await ws_client()
