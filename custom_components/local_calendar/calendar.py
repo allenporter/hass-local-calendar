@@ -2,18 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
-from ical.calendar import Calendar
-from ical.calendar_stream import IcsCalendarStream
-from ical.event import Event
-from ical.store import EventStore
-from ical.types import Range, Recur
 import voluptuous as vol
-
 from homeassistant.components.calendar import (
     ENTITY_ID_FORMAT,
     CalendarEntity,
@@ -21,10 +15,16 @@ from homeassistant.components.calendar import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv, entity_platform
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity import generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util import dt as dt_util
+from ical.calendar import Calendar
+from ical.calendar_stream import IcsCalendarStream
+from ical.event import Event
+from ical.store import EventStore
+from ical.types import Range, Recur
 
 from .const import CONF_CALENDAR_NAME, DOMAIN
 from .store import LocalCalendarStore
@@ -35,10 +35,14 @@ _LOGGER = logging.getLogger(__name__)
 EVENT_DESCRIPTION = "description"
 EVENT_END_DATE = "end_date"
 EVENT_END_DATETIME = "end_date_time"
+EVENT_RECURRENCE_ID = "recurrence_id"
+EVENT_RECURRENCE_RANGE = "recurrence_range"
 EVENT_START_DATE = "start_date"
 EVENT_START_DATETIME = "start_date_time"
 EVENT_SUMMARY = "summary"
 EVENT_RRULE = "rrule"
+EVENT_UID = "uid"
+
 
 SERVICE_CREATE_EVENT = "create_event"
 CREATE_EVENT_SCHEMA = vol.All(
@@ -65,6 +69,17 @@ CREATE_EVENT_SCHEMA = vol.All(
                 "Start and end datetimes must both be specified",
             ): cv.datetime,
             vol.Optional(EVENT_RRULE, default=""): cv.string,
+        }
+    ),
+)
+
+SERVICE_DELETE_EVENT = "delete_event"
+DELETE_EVENT_SCHEMA = vol.All(
+    cv.make_entity_service_schema(
+        {
+            vol.Required(EVENT_UID): cv.string,
+            vol.Optional(EVENT_RECURRENCE_ID): cv.string,
+            vol.Optional(EVENT_RECURRENCE_RANGE): cv.string,
         }
     ),
 )
@@ -99,6 +114,11 @@ async def async_setup_entry(
         SERVICE_CREATE_EVENT,
         CREATE_EVENT_SCHEMA,
         "async_create_event",
+    )
+    platform.async_register_entity_service(
+        SERVICE_DELETE_EVENT,
+        DELETE_EVENT_SCHEMA,
+        "async_delete_event",
     )
 
 

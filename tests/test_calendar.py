@@ -101,6 +101,24 @@ def create_event_fixture(
     return _create
 
 
+@pytest.fixture(name="delete_event")
+def delete_event_fixture(
+    hass: HomeAssistant,
+) -> Callable[[dict[str, Any]], Awaitable[None]]:
+    """Fixture to simplify deleting events for tests."""
+
+    async def _delete(data: dict[str, Any]) -> None:
+        await hass.services.async_call(
+            DOMAIN,
+            "delete_event",
+            data,
+            target={"entity_id": TEST_ENTITY},
+            blocking=True,
+        )
+
+    return _delete
+
+
 GetEventsFn = Callable[[str, str], Awaitable[dict[str, Any]]]
 
 
@@ -535,4 +553,139 @@ async def test_websocket_update(
             "start": {"dateTime": "1997-07-14T11:00:00-06:00"},
             "end": {"dateTime": "1997-07-14T22:00:00-06:00"},
         }
+    ]
+
+
+async def test_delete_event_service(
+    ws_client: ClientFixture,
+    _setup_integration: None,
+    get_events: GetEventsFn,
+    delete_event: Callable[[dict[str, Any]], Awaitable[None]],
+):
+    """Test delete event service."""
+    client = await ws_client()
+    result = await client.cmd_result(
+        "create",
+        {
+            "entity_id": TEST_ENTITY,
+            "event": {
+                "summary": "Bastille Day Party",
+                "dtstart": "1997-07-14T17:00:00+00:00",
+                "dtend": "1997-07-15T04:00:00+00:00",
+            },
+        },
+    )
+    assert "uid" in result
+    uid = result["uid"]
+
+    events = await get_events("1997-07-14T00:00:00", "1997-07-16T00:00:00")
+    assert list(map(event_fields, events)) == [
+        {
+            "summary": "Bastille Day Party",
+            "start": {"dateTime": "1997-07-14T11:00:00-06:00"},
+            "end": {"dateTime": "1997-07-14T22:00:00-06:00"},
+        }
+    ]
+
+    # Delete the event
+    await delete_event(
+        {
+            "entity_id": TEST_ENTITY,
+            "uid": uid,
+        },
+    )
+    events = await get_events("1997-07-14T00:00:00", "1997-07-16T00:00:00")
+    assert not list(map(event_fields, events))
+
+
+async def test_delete_event_recurring(
+    ws_client: ClientFixture,
+    _setup_integration: None,
+    get_events: GetEventsFn,
+    delete_event: Callable[[dict[str, Any]], Awaitable[None]],
+):
+    """Test deleting a recurring event."""
+    client = await ws_client()
+    result = await client.cmd_result(
+        "create",
+        {
+            "entity_id": TEST_ENTITY,
+            "event": {
+                "summary": "Morning Routine",
+                "dtstart": "2022-08-22T08:30:00",
+                "dtend": "2022-08-22T09:00:00",
+                "rrule": "FREQ=DAILY",
+            },
+        },
+    )
+    assert "uid" in result
+    uid = result["uid"]
+
+    events = await get_events("2022-08-22T00:00:00", "2022-08-26T00:00:00")
+    assert list(map(event_fields, events)) == [
+        {
+            "summary": "Morning Routine",
+            "start": {"dateTime": "2022-08-22T08:30:00-06:00"},
+            "end": {"dateTime": "2022-08-22T09:00:00-06:00"},
+        },
+        {
+            "summary": "Morning Routine",
+            "start": {"dateTime": "2022-08-23T08:30:00-06:00"},
+            "end": {"dateTime": "2022-08-23T09:00:00-06:00"},
+        },
+        {
+            "summary": "Morning Routine",
+            "start": {"dateTime": "2022-08-24T08:30:00-06:00"},
+            "end": {"dateTime": "2022-08-24T09:00:00-06:00"},
+        },
+        {
+            "summary": "Morning Routine",
+            "start": {"dateTime": "2022-08-25T08:30:00-06:00"},
+            "end": {"dateTime": "2022-08-25T09:00:00-06:00"},
+        },
+    ]
+
+    # Cancel a single instance and confirm it was removed
+    await delete_event(
+        {
+            "entity_id": TEST_ENTITY,
+            "recurrence_id": "20220824T083000",
+            "uid": uid,
+        }
+    )
+    events = await get_events("2022-08-22T00:00:00", "2022-08-26T00:00:00")
+    assert list(map(event_fields, events)) == [
+        {
+            "summary": "Morning Routine",
+            "start": {"dateTime": "2022-08-22T08:30:00-06:00"},
+            "end": {"dateTime": "2022-08-22T09:00:00-06:00"},
+        },
+        {
+            "summary": "Morning Routine",
+            "start": {"dateTime": "2022-08-23T08:30:00-06:00"},
+            "end": {"dateTime": "2022-08-23T09:00:00-06:00"},
+        },
+        {
+            "summary": "Morning Routine",
+            "start": {"dateTime": "2022-08-25T08:30:00-06:00"},
+            "end": {"dateTime": "2022-08-25T09:00:00-06:00"},
+        },
+    ]
+
+    # Delete all and future and confirm multiple were removed
+    await delete_event(
+        {
+            "entity_id": TEST_ENTITY,
+            "uid": uid,
+            "recurrence_id": "20220823T083000",
+            "recurrence_range": "THISANDFUTURE",
+        }
+    )
+    events = await get_events("2022-08-22T00:00:00", "2022-08-26T00:00:00")
+    assert list(map(event_fields, events)) == [
+        {
+            "summary": "Morning Routine",
+            "start": {"dateTime": "2022-08-22T08:30:00-06:00"},
+            "end": {"dateTime": "2022-08-22T09:00:00-06:00"},
+        },
     ]
