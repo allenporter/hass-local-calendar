@@ -1,0 +1,54 @@
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.0.1
+  hooks:
+  - id: trailing-whitespace
+    exclude: 'tests/testdata/.*yaml$'
+  - id: end-of-file-fixer
+  - id: check-yaml
+  - id: check-added-large-files
+- repo: https://github.com/pycqa/isort
+  rev: 5.9.3
+  hooks:
+    - id: isort
+      args: ["--profile", "black"]
+- repo: https://github.com/psf/black
+  rev: 22.3.0
+  hooks:
+  - id: black
+- repo: https://gitlab.com/pycqa/flake8
+  rev: 4.0.1
+  hooks:
+  - id: flake8
+- repo: https://github.com/pre-commit/mirrors-mypy
+  rev: v0.981
+  hooks:
+  - id: mypy
+    name: mypy
+    exclude: ^tests/
+    language: python
+    language_version: python3.9
+    types: [python]
+    # use require_serial so that script
+    # is only called once per commit
+    require_serial: true
+- repo: local
+  hooks:
+  - id: pylint
+    name: pylint
+    entry: pylint
+    language: system
+    types: [python]
+    args:
+      [
+        "-rn", # Only display messages
+        "-sn", # Don't display the score
+        "--disable=too-few-public-methods",
+        "--disable=duplicate-code",
+      ]
+- repo: https://github.com/codespell-project/codespell
+  rev: v2.1.0
+  hooks:
+    - id: codespell
+      args:
+        - --ignore-words-list=hass
