@@ -2,9 +2,10 @@
 from unittest.mock import patch
 
 from homeassistant import config_entries
-from custom_components.local_calendar.const import CONF_CALENDAR_NAME, DOMAIN
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+
+from custom_components.local_calendar.const import CONF_CALENDAR_NAME, DOMAIN
 
 
 async def test_form(hass: HomeAssistant) -> None:
@@ -16,7 +17,7 @@ async def test_form(hass: HomeAssistant) -> None:
     assert result["errors"] is None
 
     with patch(
-        "homeassistant.components.local_calendar.async_setup_entry",
+        "custom_components.local_calendar.async_setup_entry",
         return_value=True,
     ) as mock_setup_entry:
         result2 = await hass.config_entries.flow.async_configure(
