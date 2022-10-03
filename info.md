@@ -24,6 +24,8 @@ target:
 | Field | Type | Description |
 | ----- | ---- | ----------- |
 | summary | str | The short summarization or title of the event. |
+| dtstart | date or datetime | The start date or datetime of the event e.g. `2022-10-02` or `2022-10-02T19:30` |
+| dtend | date or datetime | The start date or datetime of the event e.g. `2022-10-03` or `2022-10-02T20:00` |
 | description | str | The extended description of the event. |
 | rrule | str | An rfc554 recurrence rule e.g. `FREQ=MONTHLY`. See below. |
 
