@@ -33,12 +33,10 @@ _LOGGER = logging.getLogger(__name__)
 
 
 EVENT_DESCRIPTION = "description"
-EVENT_END_DATE = "end_date"
-EVENT_END_DATETIME = "end_date_time"
+EVENT_END = "dtend"
 EVENT_RECURRENCE_ID = "recurrence_id"
 EVENT_RECURRENCE_RANGE = "recurrence_range"
-EVENT_START_DATE = "start_date"
-EVENT_START_DATETIME = "start_date_time"
+EVENT_START = "dtstart"
 EVENT_SUMMARY = "summary"
 EVENT_RRULE = "rrule"
 EVENT_UID = "uid"
@@ -46,29 +44,13 @@ EVENT_UID = "uid"
 
 SERVICE_CREATE_EVENT = "create_event"
 CREATE_EVENT_SCHEMA = vol.All(
-    cv.has_at_least_one_key(EVENT_START_DATE, EVENT_START_DATETIME),
-    cv.has_at_most_one_key(EVENT_START_DATE, EVENT_START_DATETIME),
     cv.make_entity_service_schema(
         {
             vol.Required(EVENT_SUMMARY): cv.string,
-            vol.Optional(EVENT_DESCRIPTION, default=""): cv.string,
-            vol.Inclusive(
-                EVENT_START_DATE, "dates", "Start and end dates must both be specified"
-            ): cv.date,
-            vol.Inclusive(
-                EVENT_END_DATE, "dates", "Start and end dates must both be specified"
-            ): cv.date,
-            vol.Inclusive(
-                EVENT_START_DATETIME,
-                "datetimes",
-                "Start and end datetimes must both be specified",
-            ): cv.datetime,
-            vol.Inclusive(
-                EVENT_END_DATETIME,
-                "datetimes",
-                "Start and end datetimes must both be specified",
-            ): cv.datetime,
-            vol.Optional(EVENT_RRULE, default=""): cv.string,
+            vol.Optional(EVENT_DESCRIPTION): cv.string,
+            vol.Required(EVENT_START): vol.Any(cv.date, cv.datetime),
+            vol.Required(EVENT_END): vol.Any(cv.date, cv.datetime),
+            vol.Optional(EVENT_RRULE): cv.string,
         }
     ),
 )
@@ -169,13 +151,8 @@ class LocalCalendarEntity(CalendarEntity):
             {
                 EVENT_SUMMARY: kwargs[EVENT_SUMMARY],
                 EVENT_DESCRIPTION: kwargs.get(EVENT_DESCRIPTION),
-                "dtstart": kwargs.get(
-                    "dtstart",
-                    kwargs.get(EVENT_START_DATE, kwargs.get(EVENT_START_DATETIME)),
-                ),
-                "dtend": kwargs.get(
-                    "dtend", kwargs.get(EVENT_END_DATE, kwargs.get(EVENT_END_DATETIME))
-                ),
+                "dtstart": kwargs[EVENT_START],
+                "dtend": kwargs[EVENT_END],
             }
         )
         if rrule := kwargs.get(EVENT_RRULE):
