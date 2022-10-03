@@ -9,6 +9,8 @@ be compatible with nearly all relevant features for a modern home local
 calendar.  See [ical](https://github.com/allenporter/ical) for details
 on the underlying python library.
 
+See the [Documentation](info.md) for more info.
+
 ## Development
 
 Setup development environment
