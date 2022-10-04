@@ -15,8 +15,8 @@ service: local_calendar.create_event
 data:
   summary: Nightly
   rrule: FREQ=DAILY
-  start_date_time: "2022-10-02T20:00:00"
-  end_date_time: "2022-10-02T22:00:00"
+  dstart: "2022-10-02T20:00:00"
+  dtend: "2022-10-02T22:00:00"
 target:
   entity_id: calendar.automation
 ```
