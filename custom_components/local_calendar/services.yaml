@@ -22,7 +22,7 @@ create_event:
     dtstart:
       name: Start time
       description: The date or date and time the event should start.
-      example: "2022-03-22"
+      example: "2022-03-22 22:00:00""
       selector:
         text:
     dtend:
