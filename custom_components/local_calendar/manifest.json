@@ -3,10 +3,10 @@
   "name": "Local Calendar",
   "config_flow": true,
   "documentation": "https://github.com/allenporter/hass-local-calendar",
-  "requirements": ["ical==2.1.0"],
+  "requirements": ["ical==4.1.1"],
   "codeowners": ["@allenporter"],
   "iot_class": "local_polling",
   "loggers": ["ical"],
-  "version": "0.0.1",
+  "version": "0.0.2",
   "issue_tracker": "https://github.com/allenporter/hass-local-calendar/issues"
 }

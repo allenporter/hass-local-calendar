@@ -129,12 +129,16 @@ class LocalCalendarEntity(CalendarEntity):
         self, hass: HomeAssistant, start_date: datetime, end_date: datetime
     ) -> list[LocalCalendarEvent]:
         """Get all events in a specific time frame."""
-        events = self._calendar.timeline.overlapping(start_date, end_date)
+        events = self._calendar.timeline_tz(dt_util.DEFAULT_TIME_ZONE).overlapping(
+            start_date, end_date
+        )
         return [_get_calendar_event(event) for event in events]
 
     async def async_update(self) -> None:
         """Update entity state with the next upcoming event."""
-        events = self._calendar.timeline.active_after(dt_util.now())
+        events = self._calendar.timeline_tz(dt_util.DEFAULT_TIME_ZONE).active_after(
+            dt_util.now()
+        )
         if event := next(events, None):
             self._event = _get_calendar_event(event)
         else:
